@@ -7,6 +7,7 @@
 #include "rendergraph/material/unicolormaterial.h"
 #include "rendergraph/vertexupdaters/vertexupdater.h"
 #include "skin/legacy/skincontext.h"
+#include "track/cue.h"
 #include "track/track.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "widget/wskincolor.h"
@@ -16,16 +17,22 @@ using namespace rendergraph;
 namespace allshader {
 
 WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidget,
-        ::WaveformRendererAbstract::PositionSource type)
+        ::WaveformRendererAbstract::PositionSource type,
+        bool downbeatOnly)
         : ::WaveformRendererAbstract(waveformWidget),
-          m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip) {
+          m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip),
+          m_downbeatOnly(downbeatOnly) {
     initForRectangles<UniColorMaterial>(0);
     setUsePreprocess(true);
 }
 
 void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& skinContext) {
-    m_color = QColor(skinContext.selectString(node, QStringLiteral("BeatColor")));
-    m_color = WSkinColor::getCorrectColor(m_color).toRgb();
+    if (m_downbeatOnly) {
+        m_color = QColor(220, 30, 30);
+    } else {
+        m_color = QColor(skinContext.selectString(node, QStringLiteral("BeatColor")));
+        m_color = WSkinColor::getCorrectColor(m_color).toRgb();
+    }
 }
 
 void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* event) {
@@ -94,21 +101,69 @@ bool WaveformRenderBeat::preprocessInner() {
 
     const int numVerticesPerLine = 6; // 2 triangles
 
-    // Count the number of beats in the range to reserve space in the m_vertices vector.
-    // Note that we could also use
-    //   int numBearsInRange = trackBeats->numBeatsInRange(startPosition, endPosition);
-    // for this, but there have been reports of that method failing with a DEBUG_ASSERT.
+    QList<CuePointer> cuePoints;
+    if (m_downbeatOnly) {
+        cuePoints = trackInfo->getCuePoints();
+    }
+
+    mixxx::audio::FramePos anchorBeatPos;
+    if (m_downbeatOnly) {
+        for (const CuePointer& pCue : cuePoints) {
+            if (pCue->getType() == mixxx::CueType::HotCue &&
+                    pCue->getHotCue() == mixxx::kFirstHotCueIndex) {
+                mixxx::audio::FramePos cuePos = pCue->getPosition();
+                if (cuePos.isValid()) {
+                    anchorBeatPos = trackBeats->findClosestBeat(cuePos);
+                }
+                break;
+            }
+        }
+    }
+
+    if (m_downbeatOnly && !anchorBeatPos.isValid()) {
+        auto firstIt = trackBeats->cbegin();
+        if (firstIt != trackBeats->cend()) {
+            anchorBeatPos = *firstIt;
+        }
+    }
+
     int numBeatsInRange = 0;
-    for (auto it = trackBeats->iteratorFrom(startPosition);
-            it != trackBeats->cend() && *it <= endPosition;
-            ++it) {
-        numBeatsInRange++;
+    if (m_downbeatOnly) {
+        auto it = trackBeats->iteratorFrom(startPosition);
+        int beatIndex = 0;
+        if (anchorBeatPos.isValid()) {
+            auto anchorIt = trackBeats->iteratorFrom(anchorBeatPos);
+            if (anchorIt != trackBeats->cend() && it != trackBeats->cend()) {
+                beatIndex = static_cast<int>(it - anchorIt);
+            }
+        }
+        for (; it != trackBeats->cend() && *it <= endPosition; ++it, ++beatIndex) {
+            bool isDownbeat = (((beatIndex % 4) + 4) % 4 == 0);
+            if (isDownbeat) {
+                numBeatsInRange++;
+            }
+        }
+    } else {
+        for (auto it = trackBeats->iteratorFrom(startPosition);
+                it != trackBeats->cend() && *it <= endPosition;
+                ++it) {
+            numBeatsInRange++;
+        }
     }
 
     const int reserved = numBeatsInRange * numVerticesPerLine;
     geometry().allocate(reserved);
 
     VertexUpdater vertexUpdater{geometry().vertexDataAs<Geometry::Point2D>()};
+
+    int beatIndex = 0;
+    if (m_downbeatOnly && anchorBeatPos.isValid()) {
+        auto anchorIt = trackBeats->iteratorFrom(anchorBeatPos);
+        auto firstIt = trackBeats->iteratorFrom(startPosition);
+        if (anchorIt != trackBeats->cend() && firstIt != trackBeats->cend()) {
+            beatIndex = static_cast<int>(firstIt - anchorIt);
+        }
+    }
 
     for (auto it = trackBeats->iteratorFrom(startPosition);
             it != trackBeats->cend() && *it <= endPosition;
@@ -123,12 +178,21 @@ bool WaveformRenderBeat::preprocessInner() {
         const float x1 = static_cast<float>(xBeatPoint);
         const float x2 = x1 + 1.f;
 
-        vertexUpdater.addRectangle({x1, 0.f},
-                {x2, m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth});
+        if (m_downbeatOnly) {
+            bool isDownbeat = (((beatIndex % 4) + 4) % 4 == 0);
+            if (isDownbeat) {
+                vertexUpdater.addRectangle({x1, 0.f},
+                        {x2, m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth});
+            }
+            ++beatIndex;
+        } else {
+            vertexUpdater.addRectangle({x1, 0.f},
+                    {x2, m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth});
+        }
     }
     markDirtyGeometry();
 
-    DEBUG_ASSERT(reserved == vertexUpdater.index());
+    DEBUG_ASSERT(vertexUpdater.index() <= reserved);
 
     material().setUniform(1, m_color);
     markDirtyMaterial();

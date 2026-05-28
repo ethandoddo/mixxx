@@ -2,6 +2,7 @@
 
 #include <QPainter>
 
+#include "track/cue.h"
 #include "track/track.h"
 #include "util/painterscope.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
@@ -59,10 +60,6 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     const double lastDisplayedPosition =
             m_waveformRenderer->getLastDisplayedPosition();
 
-    // qDebug() << "trackSamples" << trackSamples
-    //          << "firstDisplayedPosition" << firstDisplayedPosition
-    //          << "lastDisplayedPosition" << lastDisplayedPosition;
-
     const auto startPosition = mixxx::audio::FramePos::fromEngineSamplePos(
             firstDisplayedPosition * trackSamples);
     const auto endPosition = mixxx::audio::FramePos::fromEngineSamplePos(
@@ -86,27 +83,84 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     const float rendererWidth = m_waveformRenderer->getWidth();
     const float rendererHeight = m_waveformRenderer->getHeight();
 
+    QVector<QLineF> downbeats;
+    downbeats.resize(128);
     int beatCount = 0;
+    int downbeatCount = 0;
 
-    for (; it != trackBeats->cend() && *it <= endPosition; ++it) {
-        double beatPosition = it->toEngineSamplePos();
-        double xBeatPoint =
-                m_waveformRenderer->transformSamplePositionInRendererWorld(beatPosition);
-
-        xBeatPoint = qRound(xBeatPoint * devicePixelRatio) / devicePixelRatio;
-
-        // If we don't have enough space, double the size.
-        if (beatCount >= m_beats.size()) {
-            m_beats.resize(m_beats.size() * 2);
-        }
-
-        if (orientation == Qt::Horizontal) {
-            m_beats[beatCount++].setLine(xBeatPoint, 0.0f, xBeatPoint, rendererHeight);
-        } else {
-            m_beats[beatCount++].setLine(0.0f, xBeatPoint, rendererWidth, xBeatPoint);
+    // Find the A cue (hot cue index 0) to use as the downbeat anchor.
+    // Fall back to the first beat of the track if no A cue is set.
+    mixxx::audio::FramePos anchorBeatPos;
+    const QList<CuePointer> cuePoints = pTrackInfo->getCuePoints();
+    for (const CuePointer& pCue : cuePoints) {
+        if (pCue->getType() == mixxx::CueType::HotCue &&
+                pCue->getHotCue() == mixxx::kFirstHotCueIndex) {
+            mixxx::audio::FramePos cuePos = pCue->getPosition();
+            if (cuePos.isValid()) {
+                // Snap to the closest beat so we're always on a beat boundary.
+                // This is sample-accurate — no floating point BPM math.
+                anchorBeatPos = trackBeats->findClosestBeat(cuePos);
+            }
+            break;
         }
     }
 
-    // Make sure to use constData to prevent detaches!
+    // No A cue — fall back to the first beat of the track
+    if (!anchorBeatPos.isValid()) {
+        auto firstIt = trackBeats->cbegin();
+        if (firstIt != trackBeats->cend()) {
+            anchorBeatPos = *firstIt;
+        }
+    }
+
+    int beatIndex = 0;
+    if (anchorBeatPos.isValid()) {
+        auto anchorIt = trackBeats->iteratorFrom(anchorBeatPos);
+        if (anchorIt != trackBeats->cend()) {
+            beatIndex = it - anchorIt;
+        }
+    }
+
+    for (; it != trackBeats->cend() && *it <= endPosition; ++it, ++beatIndex) {
+        double beatPosition = it->toEngineSamplePos();
+        double xBeatPoint =
+                m_waveformRenderer->transformSamplePositionInRendererWorld(beatPosition);
+        xBeatPoint = qRound(xBeatPoint * devicePixelRatio) / devicePixelRatio;
+
+        // beatIndex == 0 is the anchor (A cue beat).
+        // Every 4th beat from there is a downbeat.
+        // Positive modulo handles negative indices (beats before anchor) correctly.
+        bool isDownbeat = (((beatIndex % 4) + 4) % 4 == 0);
+
+        if (isDownbeat) {
+            if (downbeatCount >= downbeats.size()) {
+                downbeats.resize(downbeats.size() * 2);
+            }
+            if (orientation == Qt::Horizontal) {
+                downbeats[downbeatCount++].setLine(xBeatPoint, 0.0f, xBeatPoint, rendererHeight);
+            } else {
+                downbeats[downbeatCount++].setLine(0.0f, xBeatPoint, rendererWidth, xBeatPoint);
+            }
+        } else {
+            if (beatCount >= m_beats.size()) {
+                m_beats.resize(m_beats.size() * 2);
+            }
+            if (orientation == Qt::Horizontal) {
+                m_beats[beatCount++].setLine(xBeatPoint, 0.0f, xBeatPoint, rendererHeight);
+            } else {
+                m_beats[beatCount++].setLine(0.0f, xBeatPoint, rendererWidth, xBeatPoint);
+            }
+        }
+    }
+
+    // Draw regular beats (existing color from skin)
     painter->drawLines(m_beats.constData(), beatCount);
+
+    // Draw downbeats in red (anchored to A cue, every 4 beats)
+    QColor downbeatColor(220, 30, 30);
+    downbeatColor.setAlphaF(m_beatColor.alphaF());
+    QPen downbeatPen(downbeatColor);
+    downbeatPen.setWidthF(std::max(1.0, scaleFactor()));
+    painter->setPen(downbeatPen);
+    painter->drawLines(downbeats.constData(), downbeatCount);
 }

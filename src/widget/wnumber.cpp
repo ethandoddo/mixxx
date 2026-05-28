@@ -3,9 +3,9 @@
 #include "moc_wnumber.cpp"
 #include "skin/legacy/skincontext.h"
 
-WNumber::WNumber(QWidget* pParent)
+WNumber::WNumber(QWidget* pParent, int numberOfDigits)
         : WLabel(pParent),
-          m_iNoDigits(2) {
+                    m_iNoDigits(numberOfDigits) {
 }
 
 void WNumber::setup(const QDomNode& node, const SkinContext& context) {
@@ -24,9 +24,12 @@ void WNumber::onConnectedControlChanged(double dParameter, double dValue) {
 }
 
 void WNumber::setValue(double dValue) {
-    if (m_skinText.contains("%1")) {
-        setText(m_skinText.arg(QString::number(dValue, 'f', m_iNoDigits)));
-    } else {
-        setText(m_skinText + QString::number(dValue, 'f', m_iNoDigits));
+    const QString newText = m_skinText.contains("%1")
+            ? m_skinText.arg(QString::number(dValue, 'f', m_iNoDigits))
+            : m_skinText + QString::number(dValue, 'f', m_iNoDigits);
+    if (newText == m_lastDisplayText) {
+        return;
     }
+    m_lastDisplayText = newText;
+    setText(newText);
 }

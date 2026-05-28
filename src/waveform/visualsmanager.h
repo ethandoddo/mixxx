@@ -16,6 +16,9 @@ namespace {
 constexpr int kUpdateRate = 15; // updates per second
 // Number of kiUpdateRates that go by before we update BPM.
 constexpr int kSlowUpdateDivider = 4; // kUpdateRate / kSlowUpdateDivider = 3.75 updates per sec
+// Minimum BPM change required to update visual_bpm, suppresses floating-point
+// noise in the beat window calculation that causes the display to flicker.
+constexpr double kVisualBpmDeadband = 0.05;
 
 } // anonymous namespace
 
@@ -49,6 +52,7 @@ class DeckVisuals {
     std::unique_ptr<ControlProxy> m_pEndOfTrack;
 
     QSharedPointer<VisualPlayPosition> m_pVisualPlayPos;
+    double m_lastVisualBpm;
 };
 
 class VisualsManager {

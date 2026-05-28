@@ -300,7 +300,11 @@ void KeyControl::updateRate() {
 }
 
 void KeyControl::slotFileKeyChanged(double value) {
+    qInfo() << "[KEY DEBUG] slotFileKeyChanged: file_key numeric value =" << value
+             << "-> ChromaticKey =" << KeyUtils::keyFromNumericValue(value)
+             << "-> text =" << KeyUtils::keyToString(KeyUtils::keyFromNumericValue(value));
     updateKeyCOs(value,  m_pPitch->get() / 12);
+    qInfo() << "[KEY DEBUG] slotFileKeyChanged: after updateKeyCOs, engine key =" << m_pEngineKey->get();
 }
 
 void KeyControl::updateKeyCOs(double fileKeyNumeric, double pitchOctaves) {

@@ -715,6 +715,10 @@ void BaseTrackPlayerImpl::slotTrackLoaded(TrackPointer pNewTrack,
         // Update the BPM and duration values that are stored in ControlObjects
         m_pDuration->set(m_pLoadedTrack->getDuration());
         m_pFileBPM->set(m_pLoadedTrack->getBpm());
+        qInfo() << "[KEY DEBUG] slotTrackLoaded:" << getGroup()
+                 << "track->getKey() =" << m_pLoadedTrack->getKey()
+                 << "track->getKeyText() =" << m_pLoadedTrack->getKeyText()
+                 << "setting file_key to:" << static_cast<double>(m_pLoadedTrack->getKey());
         m_pKey->set(m_pLoadedTrack->getKey());
         slotSetTrackColor(m_pLoadedTrack->getColor());
 

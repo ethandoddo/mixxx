@@ -634,21 +634,21 @@
             <control>
                 <description>CROSSFADER - slider</description>
                 <group>[Master]</group>
-                <key>crossfader</key>
+                <key>PioneerDDJFLX4.disableCrossfader</key>
                 <status>0xB6</status>
                 <midino>0x1F</midino>
                 <options>
-                    <fourteen-bit-msb/>
+                    <Script-Binding/>
                 </options>
             </control>
             <control>
                 <description>CROSSFADER - slider</description>
                 <group>[Master]</group>
-                <key>crossfader</key>
+                <key>PioneerDDJFLX4.disableCrossfader</key>
                 <status>0xB6</status>
                 <midino>0x3F</midino>
                 <options>
-                    <fourteen-bit-lsb/>
+                    <Script-Binding/>
                 </options>
             </control>
 

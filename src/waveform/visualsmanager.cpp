@@ -1,5 +1,7 @@
 #include "waveform/visualsmanager.h"
 
+#include <cmath>
+
 #include "control/controlobject.h"
 #include "waveform/visualplayposition.h"
 
@@ -7,6 +9,7 @@ DeckVisuals::DeckVisuals(const QString& group)
         : m_group(group),
           m_SlowTickCnt(0),
           m_trackLoaded(false),
+          m_lastVisualBpm(0.0),
           m_pPlayButton(std::make_unique<ControlProxy>(ConfigKey(group, "play"))),
           m_pLoopEnabled(std::make_unique<ControlProxy>(ConfigKey(group, "loop_enabled"))),
           m_pEngineBpm(std::make_unique<ControlProxy>(ConfigKey(group, "bpm"))),
@@ -44,10 +47,15 @@ void DeckVisuals::process(double remainingTimeTriggerSeconds) {
         m_pEndOfTrack->set(1.0);
     }
 
-    // Update the BPM even more slowly
+    // Update the BPM even more slowly, and only when the change exceeds the
+    // deadband to suppress floating-point noise in the beat window calculation.
     m_SlowTickCnt = (m_SlowTickCnt + 1) % kSlowUpdateDivider;
     if (m_SlowTickCnt == 0 || !trackLoaded) {
-        m_pVisualBpm->set(m_pEngineBpm->get());
+        const double engineBpm = m_pEngineBpm->get();
+        if (!trackLoaded || std::abs(engineBpm - m_lastVisualBpm) >= kVisualBpmDeadband) {
+            m_lastVisualBpm = engineBpm;
+            m_pVisualBpm->set(engineBpm);
+        }
     }
     m_pVisualKey->set(m_pEngineKey->get());
 

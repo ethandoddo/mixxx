@@ -26,6 +26,7 @@
 
 #include <QFuture>
 #include <QFutureWatcher>
+#include <QSet>
 #include <QStringListModel>
 #include <QtConcurrentRun>
 #include <fstream>
@@ -34,6 +35,8 @@
 #include "library/baseexternalplaylistmodel.h"
 #include "library/baseexternaltrackmodel.h"
 #include "library/treeitemmodel.h"
+#include "track/track_decl.h"
+#include "track/trackid.h"
 #include "util/parented_ptr.h"
 
 class TrackCollectionManager;
@@ -75,6 +78,8 @@ class RekordboxFeature : public BaseExternalLibraryFeature {
 
   private slots:
     void htmlLinkClicked(const QUrl& link);
+    void slotTrackLoadedToDeck(TrackPointer pTrack, const QString& group);
+    void slotTracksChanged(const QSet<TrackId>& trackIds);
 
   private:
     QString formatRootViewHtml() const;

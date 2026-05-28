@@ -573,9 +573,18 @@ QList<QWidget*> LegacySkinParser::parseNode(const QDomElement& node) {
         result = wrapWidget(parseRateRange(node));
     } else if (nodeName == "NumberPos") {
         result = wrapWidget(parseNumberPos(node));
-    } else if (nodeName == "Number" || nodeName == "NumberBpm") {
-        // NumberBpm is deprecated, and is now the same as a Number
+    } else if (nodeName == "Number") {
         result = wrapWidget(parseLabelWidget<WNumber>(node));
+    } else if (nodeName == "NumberBpm") {
+        const int bpmColumnPrecision = qBound(
+                BaseTrackTableModel::kBpmColumnPrecisionMinimum,
+                m_pConfig->getValue(
+                        mixxx::library::prefs::kBpmColumnPrecisionConfigKey,
+                        BaseTrackTableModel::kBpmColumnPrecisionDefault),
+                BaseTrackTableModel::kBpmColumnPrecisionMaximum);
+        WNumber* pNumberBpm = new WNumber(m_pParent, bpmColumnPrecision);
+        setupLabelWidget(node, pNumberBpm);
+        result = wrapWidget(pNumberBpm);
     } else if (nodeName == "BpmEditor") {
         result = wrapWidget(parseBpmEditor(node));
     } else if (nodeName == "NumberDb") {

@@ -43,6 +43,9 @@ void WKey::setup(const QDomNode& node, const SkinContext& context) {
 void WKey::setValue() {
     m_key = KeyUtils::keyFromNumericValue(m_engineKey.get());
     m_diff_cents = m_engineKeyDistance.get();
+    qInfo() << "[KEY DEBUG] WKey::setValue: engine key numeric =" << m_engineKey.get()
+             << "-> ChromaticKey =" << m_key
+             << "-> INVALID?" << (m_key == mixxx::track::io::key::INVALID);
     if (m_key != mixxx::track::io::key::INVALID) {
         // Render this key with the user-provided notation.
         QString keyStr = "";
@@ -78,6 +81,11 @@ void WKey::keyNotationChanged(double dKeyNotationValue) {
 }
 
 void WKey::paintEvent(QPaintEvent* event) {
+    qInfo() << "[KEY DEBUG] WKey::paintEvent: key=" << m_key
+            << "colorEnabled=" << m_colorPaletteSettings.getKeyColorsEnabled()
+            << "text=" << text()
+            << "size=" << size()
+            << "rect=" << rect();
     if (m_key == mixxx::track::io::key::INVALID || !m_colorPaletteSettings.getKeyColorsEnabled()) {
         WLabel::paintEvent(event);
         return;
@@ -103,6 +111,7 @@ void WKey::paintEvent(QPaintEvent* event) {
 
     const QStyle* pStyle = style();
     const QRect contRect = pStyle->subElementRect(QStyle::SE_FrameContents, &option, this);
+    qInfo() << "[KEY DEBUG] WKey::paintEvent: contRect=" << contRect << "widgetRect=" << rect();
 
     const int rectWidth = 4;
     const int splitHeight = static_cast<int>(contRect.height() * splitPoint);

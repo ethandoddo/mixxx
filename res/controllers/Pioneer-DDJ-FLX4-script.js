@@ -246,12 +246,19 @@ PioneerDDJFLX4.toggleLight = function(midiIn, active) {
     midi.sendShortMsg(midiIn.status, midiIn.data1, active ? 0x7F : 0);
 };
 
+PioneerDDJFLX4.disableCrossfader = function() {
+    engine.setValue("[Channel1]", "orientation", 1);
+    engine.setValue("[Channel2]", "orientation", 1);
+    engine.setValue("[Master]", "crossfader", 0);
+};
+
 //
 // Init
 //
 
 PioneerDDJFLX4.init = function() {
     engine.setValue("[EffectRack1_EffectUnit1]", "show_focus", 1);
+    PioneerDDJFLX4.disableCrossfader();
 
     engine.makeConnection("[Channel1]", "vu_meter", PioneerDDJFLX4.vuMeterUpdate);
     engine.makeConnection("[Channel2]", "vu_meter", PioneerDDJFLX4.vuMeterUpdate);
